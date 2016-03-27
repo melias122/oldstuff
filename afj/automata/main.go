@@ -38,6 +38,16 @@ func acceptWord(auto *Automata) {
 	}
 }
 
+func convert(old *Automata) {
+	new := NFAToDFA(old)
+	fmt.Println(old)
+	fmt.Println(new)
+}
+
+func minimalize(auto *Automata) {
+
+}
+
 func main() {
 	flag.Parse()
 
@@ -57,10 +67,18 @@ func main() {
 		fatal(err.Error())
 	}
 
+	// fmt.Println("---")
+	// fmt.Println(auto.String())
+	// fmt.Println("---")
+
 	switch {
+	case *opt2:
+		convert(auto)
+	case *opt3:
+		minimalize(auto)
 	case *opt1:
 		acceptWord(auto)
-	case *opt2:
-	case *opt3:
+	default:
+		return
 	}
 }

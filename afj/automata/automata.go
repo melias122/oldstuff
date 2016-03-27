@@ -16,8 +16,10 @@ const (
 )
 
 type Automata struct {
+	Initial *State
+
 	Alphabet map[string]bool
-	States   []*State
+	States   States
 	Typ      AutomataType
 }
 
@@ -32,11 +34,12 @@ func NewAutomata(rd io.Reader) (*Automata, error) {
 	r.ReadLine().Format(&NStates)
 	r.ReadLine().Format(&TermCount)
 
-	states := make(map[string]*State) // [state_name]*state
+	states := States{}
 	for i := 0; i < NStates; i++ {
 		var name, typ string
 		r.ReadLine().Split(" ", &name, &typ)
-		states[name] = NewState(name, typ)
+		state := NewState(name, NewStateType(typ))
+		states.Add(state)
 	}
 
 	auto.Alphabet = make(map[string]bool)
@@ -45,41 +48,45 @@ func NewAutomata(rd io.Reader) (*Automata, error) {
 		auto.Alphabet[s] = true
 	}
 
-	for {
+	for r.Error() == nil {
 		var from, to, symbol string
 		r.ReadLine().Split(",", &from, &symbol, &to)
-		if r.Error() != nil {
-			break
-		}
-		states[from].AddTransition(symbol, states[to])
+		states.Connect(from, symbol, to)
 	}
 
 	switch r.Error() {
-	case io.EOF, nil:
+	case io.EOF:
 	default:
 		return nil, errors.New(inputFile + ": nespravny format suboru")
 	}
 
-	auto.Typ = DFA
-	auto.States = make([]*State, 0, NStates)
-	for _, s := range states {
-		auto.States = append(auto.States, s)
-
-		if auto.Typ == DFA {
-			for s, t := range s.Transitions {
-				if len(t) > 1 || s == EPSILON {
-					auto.Typ = NFA
-					break
-				}
-			}
-		}
-	}
-
+	auto.init(states)
 	return &auto, nil
 }
 
+func (a *Automata) init(states States) {
+	a.States = states
+	for _, s := range states {
+		if s.Typ.Equals(Initial) {
+			a.Initial = s
+			break
+		}
+	}
+	a.Typ = DFA
+	for _, s := range states {
+		if a.Typ == NFA {
+			break
+		}
+		for s, t := range s.Transitions {
+			if len(t) > 1 || s == EPSILON {
+				a.Typ = NFA
+				break
+			}
+		}
+	}
+}
+
 func (a *Automata) String() string {
-	// s := fmt.Sprintf("%s: {%s}\n", a.Typ, a.Alphabet)
 	s := "Automata type: " + string(a.Typ) + "\nAlphabet = {"
 	sep := ""
 	for alpha := range a.Alphabet {
@@ -93,18 +100,9 @@ func (a *Automata) String() string {
 	return s
 }
 
-func (a *Automata) InitialState() *State {
-	for _, s := range a.States {
-		if s.Typ == INIT {
-			return s
-		}
-	}
-	return nil
-}
+func (a *Automata) Accept(s string) bool {
 
-func (a *Automata) Accept(word string) bool {
-
-	state := a.InitialState()
+	state := a.Initial
 	if state == nil {
 		return false
 	}
@@ -112,17 +110,13 @@ func (a *Automata) Accept(word string) bool {
 		ok     bool
 		states []*State
 	)
-	for _, ch := range word {
+	for _, ch := range s {
 		if states, ok = state.Transitions[string(ch)]; !ok {
 			return false
 		}
 		state = states[0]
 	}
-
-	if state.Typ != FINAL {
-		return false
-	}
-	return true
+	return state.Typ.Equals(Final)
 }
 
 type errReader struct {
@@ -140,12 +134,7 @@ func (e *errReader) String() string {
 func (e *errReader) ReadLine() *errReader {
 	line, err := e.r.ReadString('\n')
 	e.setErr(err)
-
-	if len(line) > 1 {
-		line = line[:len(line)-1]
-	}
 	e.line = line
-
 	return e
 }
 
@@ -167,11 +156,7 @@ func (e *errReader) Split(sep string, args ...interface{}) {
 }
 
 func (e *errReader) scan(s string, arg interface{}) {
-	_, err := fmt.Sscan(s, arg)
-	// fmt.Println(err)
-	if err != nil {
-		fmt.Println(err, s)
-	}
+	_, err := fmt.Sscanln(s, arg)
 	e.setErr(err)
 }
 
