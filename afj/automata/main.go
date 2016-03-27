@@ -24,11 +24,10 @@ func fatal(s string) {
 
 func acceptWord(auto *Automata) {
 	if auto.Typ != DFA {
-		fatal("Automat nie je DKA")
+		auto = NFAToDFA(auto)
 	}
 
 	var word string
-	fmt.Print("@<<: ")
 	fmt.Fscanln(os.Stdin, &word)
 
 	if auto.Accept(word) {
@@ -40,8 +39,12 @@ func acceptWord(auto *Automata) {
 
 func convert(old *Automata) {
 	new := NFAToDFA(old)
-	fmt.Println(old)
-	fmt.Println(new)
+	f, err := os.Create(outputFile)
+	if err != nil {
+		fatal("Nepodarilo sa otvorit subor " + outputFile)
+	}
+	defer f.Close()
+	new.WriteTo(f)
 }
 
 func minimalize(auto *Automata) {
@@ -66,10 +69,6 @@ func main() {
 	if err != nil {
 		fatal(err.Error())
 	}
-
-	// fmt.Println("---")
-	// fmt.Println(auto.String())
-	// fmt.Println("---")
 
 	switch {
 	case *opt2:

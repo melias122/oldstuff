@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"sort"
 )
 
@@ -59,20 +60,30 @@ func NewState(name string, typ StateType) *State {
 }
 
 func JoinStates(s States) *State {
-	sort.Sort(byName{s})
+	states := map[string]bool{}
+	joined := States{}
+	for _, s := range s {
+		if !states[s.Name] {
+			joined = append(joined, s)
+			states[s.Name] = true
+		}
+	}
+	sort.Sort(byName{joined})
 	var (
 		name string
 		typ  StateType
 		sep  string
 	)
-	for _, s0 := range s {
+	for _, s0 := range joined {
 		name += sep + s0.Name
-		typ |= s0.Typ
+		if s0.Typ.Equals(Final) {
+			typ = Final
+		}
 		sep = "-"
 	}
 
 	new := NewState(name, typ)
-	for _, s0 := range s {
+	for _, s0 := range joined {
 		for symbol, state := range s0.Transitions {
 			new.AddTransition(symbol, state...)
 		}
@@ -88,7 +99,11 @@ func (s *State) AddTransition(symbol string, state ...*State) {
 	if !ok {
 		s.Transitions[symbol] = States{}
 	}
-	t = append(t, state...)
+	for _, s := range state {
+		if _, ok := t.Find(s.Name); !ok {
+			t = append(t, s)
+		}
+	}
 	s.Transitions[symbol] = t
 }
 
@@ -106,6 +121,12 @@ func (s State) String() string {
 		str += "}\n"
 	}
 	return str
+}
+
+func (s State) WriteTo(w io.Writer) {
+	for symbol, s0 := range s.Transitions {
+		fmt.Fprintf(w, "%s,%s,%s\n", s.Name, symbol, s0[0].Name)
+	}
 }
 
 type States []*State
