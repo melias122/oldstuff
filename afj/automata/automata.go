@@ -100,6 +100,21 @@ func (a *Automata) String() string {
 	return s
 }
 
+func (a *Automata) WriteTo(w io.Writer) error {
+	fmt.Fprintln(w, len(a.States))
+	fmt.Fprintln(w, len(a.Alphabet))
+	for _, s := range a.States {
+		fmt.Fprintln(w, s.Name, s.Typ)
+	}
+	for ch := range a.Alphabet {
+		fmt.Fprintln(w, ch)
+	}
+	for _, s := range a.States {
+		s.WriteTo(w)
+	}
+	return nil
+}
+
 func (a *Automata) Accept(s string) bool {
 
 	state := a.Initial
