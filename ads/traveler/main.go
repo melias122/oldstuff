@@ -25,92 +25,88 @@ func read(r io.Reader) ([][]int, error) {
 	return mat, nil
 }
 
-type Solution struct {
-	// track    bytes.Buffer
-	track    []byte
-	distance int
+type c struct {
+	k int
+	b string
 }
 
-func NewSolution(d int, t ...byte) *Solution {
-	return &Solution{
-		track:    append(make([]byte, 0, 32), t...),
-		distance: d,
+func toC(to int, via []byte) c {
+	return c{k: to, b: string(via)}
+}
+
+func fromC(c c) (int, []byte) {
+	return c.k, []byte(c.b)
+}
+
+func delete(b []byte, i int) []byte {
+	new := make([]byte, 0, len(b)-1)
+	new = append(new, b[:i]...)
+	return append(new, b[i+1:]...)
+}
+
+type DynamicTSP struct {
+	cost  [][]int
+	cache map[c]c
+}
+
+func NewDynamicTSP(mat [][]int) *DynamicTSP {
+	d := &DynamicTSP{
+		cost:  mat,
+		cache: make(map[c]c),
 	}
+	return d
 }
 
-func (s *Solution) String() string {
-	return string(s.track)
-}
-
-func (d *Distance) Find(from int, G []byte, min int) *Solution {
-	if len(G) == 1 {
-		return NewSolution(
-			d.mat[from][G[0]]+d.mat[G[0]][0],
-			[]byte{1, G[0] + 1, byte(from) + 1}...,
-		)
+func (d *DynamicTSP) Solve() (int, []byte) {
+	via := make([]byte, len(d.cost)-1)
+	for i := range via {
+		via[i] = byte(i + 1)
 	}
+	for i := 1; i < len(d.cost); i++ {
+		d.cache[toC(i, []byte{})] = toC(d.cost[i][0], []byte{0, byte(i)})
+	}
+	return d.MinCost(0, via)
+}
 
+func (d *DynamicTSP) Cost(to byte, via []byte) (int, []byte) {
+	key := toC(int(to), via)
+	c, ok := d.cache[key]
+	if ok {
+		i, b := fromC(c)
+		return i, b
+	}
+	distance, track := d.MinCost(to, via)
+	d.cache[key] = toC(distance, track)
+	return distance, track
+}
+
+func (d *DynamicTSP) MinCost(to byte, via []byte) (int, []byte) {
 	var (
-		best *Solution
+		track   []byte
+		minCost = math.MaxInt32
+		nexto   byte
 	)
-	for i, next := range G {
-
-		C := d.mat[from][next]
-
-		nextG := append(make([]byte, 0, len(G)-1), G[:i]...)
-		nextG = append(nextG, G[i+1:]...)
-
-		solution, ok := d.get(int(next), nextG)
-		if !ok {
-			solution = d.Find(int(next), nextG, min)
-			if solution == nil {
-				continue
-			}
-			d.add(solution)
-		}
-
-		if solution.distance+C < min {
-			s := NewSolution(solution.distance+C, solution.track...)
-			s.track = append(s.track, byte(from)+1)
-			min = s.distance
-			best = s
+	for i, next := range via {
+		cost, subtrack := d.Cost(next, delete(via, i))
+		if cost < minCost {
+			minCost = cost
+			nexto = next
+			track = append(subtrack, to)
 		}
 	}
-	if len(G) > 12 && best != nil {
-		fmt.Println(len(G), best.track)
+	return minCost + d.cost[to][nexto], track
+}
+
+func (d *DynamicTSP) Write(track []byte) {
+	// create file for A
+	a, err := os.Create("A.txt")
+	if err != nil {
+		log.Fatal(err)
 	}
-	return best
-}
-
-func (d *Distance) get(from int, g []byte) (s *Solution, ok bool) {
-	buf := []byte{1}
-	buf = append(buf, g...)
-	s, ok = d.solutions[string(buf)]
-	return
-}
-
-func (d *Distance) add(s *Solution) {
-	d.solutions[s.String()] = s
-}
-
-type Distance struct {
-	mat [][]int
-	min int
-
-	solutions map[string]*Solution
-}
-
-func Dynamic(w io.Writer, mat [][]int) {
-	solver := Distance{
-		mat:       mat,
-		solutions: make(map[string]*Solution),
+	defer a.Close()
+	for i := len(track) - 1; i >= 0; i-- {
+		fmt.Fprintln(a, track[i]+1)
 	}
-	to := make([]uint8, len(mat)-1)
-	for i := range to {
-		to[i] = uint8(i + 1)
-	}
-	s := solver.Find(0, to, math.MaxInt64)
-	fmt.Println(s.distance, s.track)
 }
 
 func Greedy(w io.Writer, mat [][]int) {
@@ -118,6 +114,7 @@ func Greedy(w io.Writer, mat [][]int) {
 		distance int
 		current  int
 		visited  = make(map[int]bool)
+		track    []int
 	)
 	for len(visited) < len(mat) {
 		var (
@@ -139,14 +136,26 @@ func Greedy(w io.Writer, mat [][]int) {
 				next = i
 			}
 		}
-		// print current to output
-		fmt.Fprintln(w, current+1)
+		track = append(track, current+1)
 		distance += mat[current][next]
 		current = next
 	}
-	// print last(first)
-	fmt.Fprintln(w, current+1)
-	// fmt.Println("Distance:", distance)
+	track = append(track, current+1)
+	for _, t := range track {
+		fmt.Fprintln(w, t)
+	}
+	// fmt.Println(distance, track)
+}
+
+func resize(mat [][]int, i int) [][]int {
+	new := make([][]int, i)
+	for r := range new {
+		new[r] = make([]int, i)
+		for s := range new[r] {
+			new[r][s] = mat[r][s]
+		}
+	}
+	return new
 }
 
 func main() {
@@ -158,16 +167,9 @@ func main() {
 
 	// read matrix
 	mat, err := read(f)
-
-	// create file for A
-	a, err := os.Create("A.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer a.Close()
-
-	// dynamic solver
-	Dynamic(a, mat)
 
 	// create file for B
 	b, err := os.Create("B.txt")
@@ -179,13 +181,10 @@ func main() {
 	// greedy solver
 	Greedy(b, mat)
 
-	// d := Distance{
-	// 	solutions: make(map[string]*Solution),
-	// }
-	// g := []byte{1, 2, 3, 1}
-	// s := NewSolution(0, g...)
-	// fmt.Println(s.track)
-	// d.add(s)
-	// s2, ok := d.get(1, g[1:])
-	// fmt.Println(s2, ok)
+	// dynamic solver
+	// try more if you have more than 4gb ram
+	mat = resize(mat, 21)
+	tsp := NewDynamicTSP(mat)
+	_, track := tsp.Solve()
+	tsp.Write(track)
 }
