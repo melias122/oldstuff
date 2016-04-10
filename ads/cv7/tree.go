@@ -1,22 +1,18 @@
 package main
 
-import (
-	"bytes"
-	"fmt"
-	"math/rand"
-)
+import "fmt"
 
 type Node struct {
-	value       int
-	left, right *Node
+	value rune
+	nodes []*Node
 }
 
-func NewNode(value int) *Node {
+func NewNode(value rune) *Node {
 	return &Node{value: value}
 }
 
 func (n *Node) String() string {
-	return fmt.Sprint(n.value)
+	return fmt.Sprint(string(n.value))
 }
 
 type BST struct {
@@ -24,70 +20,49 @@ type BST struct {
 }
 
 func (b *BST) String() string {
-	return b.levelOrder(b.root)
+	return b.levelOrder([]*Node{b.root})
 }
 
-func (b *BST) levelOrder(node *Node) string {
+func (b *BST) levelOrder(nodes []*Node) string {
 	var (
-		fun func(nodes []*Node)
-		buf bytes.Buffer
+		s   string
+		sep string
 	)
-	fun = func(nodes []*Node) {
-		next := []*Node{}
-		var sep string
-		for _, n := range nodes {
-			buf.WriteString(sep + n.String())
-			sep = " "
-			if n.right != nil {
-				next = append(next, n.right)
-			}
-			if n.left != nil {
-				next = append(next, n.left)
-			}
+	for _, node := range nodes {
+		if len(node.nodes) > 0 {
+			s += b.levelOrder(node.nodes)
 		}
-		if len(next) > 0 {
-			buf.WriteString("\n")
-			fun(next)
-		}
-	}
-	fun([]*Node{node})
-	return buf.String()
-}
-
-func (b *BST) inorderString(node *Node) string {
-	var s string
-	if node.left != nil {
-		s += b.inorderString(node.left)
-	}
-	s += node.String()
-	if node.right != nil {
-		s += b.inorderString(node.right)
+		s += fmt.Sprintf("%s%s", sep, string(node.value))
 	}
 	return s
 }
 
-func (b *BST) Put(value int) {
-	b.put(value, &b.root)
-}
-
-func (b *BST) put(value int, node **Node) {
-	if *node == nil {
-		*node = NewNode(value)
-		return
+func (b *BST) Put(s string) {
+	if b.root == nil {
+		b.root = NewNode(0)
 	}
-	if (*node).value == value {
-		return
-	} else if value < (*node).value {
-		b.put(value, &(*node).left)
-	} else {
-		b.put(value, &(*node).right)
+	current := b.root
+	for _, value := range s {
+		var next *Node
+		for _, node := range current.nodes {
+			if node.value == value {
+				next = node
+				break
+			}
+		}
+		if next == nil {
+			next = NewNode(value)
+			current.nodes = append(current.nodes, next)
+		}
+		current = next
 	}
 }
 
 func main() {
-	b := &BST{}
-	for i := 0; i < 10; i++ {
-		b.Put(rand.Int() % 10)
-	}
+	b := &BST{root: NewNode(0)}
+	b.Put("jano")
+	b.Put("jazo")
+	b.Put("fero")
+	b.Put("karol")
 	fmt.Println(b)
 }
