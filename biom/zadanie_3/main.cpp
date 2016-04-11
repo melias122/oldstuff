@@ -10,15 +10,17 @@ using namespace cv;
 struct k : public pair<int, int> {
 	k(int i, int j)
 		: pair(i, j)
-	{}
+	{
+	}
 };
 
 struct Iris {
-	Iris(){}
+	Iris() {}
 	explicit Iris(const Mat &t, const Mat &m)
 		: temp{move(t)}
 		, mask{move(m)}
-	{}
+	{
+	}
 	Mat temp, mask;
 };
 
@@ -28,7 +30,8 @@ void showImage(const String &name, const Mat &image, bool wait = true)
 {
 	namedWindow(name, WINDOW_AUTOSIZE);
 	imshow(name, image);
-	if (wait) waitKey(0);
+	if (wait)
+		waitKey(0);
 }
 
 int readImage(Mat &image, const char *path)
@@ -84,12 +87,18 @@ int Ham(const Mat &a, const Mat &b, const Mat &mask)
 	return i;
 }
 
+struct CompareResult {
+	int distance{0};
+	int rotation{0};
+	Mat a, b, mask;
+};
+
 // Compare a to b, rotate b
-int Compare(const Iris &a, Iris &b)
+CompareResult Compare(const Iris &a, Iris &b, bool stats = false)
 {
 	Mat bRot, bMaskRot;
 	int min = (a.temp.rows * a.temp.cols) + 1;
-	int idx = 0;
+	CompareResult r;
 	for (int i = -20; i < 20; i++) {
 
 		// rotate b, bMask
@@ -104,18 +113,22 @@ int Compare(const Iris &a, Iris &b)
 		int d = Ham(a.temp, bRot, mask);
 		if (d < min) {
 			min = d;
-			idx = i;
+			r.rotation = i;
+			r.distance = d;
 		}
 	}
-//	if (bestrot != NULL) {
-//		*bestrot = idx;
-//		// rotate b, bMask
-//		Rot(bRot, b, idx);
-//		Rot(bMaskRot, bMask, idx);
-//		b = bRot;
-//		bMask = bMaskRot;
-//	}
-	return min;
+	if (stats) {
+		r.a = Mat::zeros(a.temp.size(), a.temp.type());
+		r.b = Mat::zeros(b.temp.size(), b.temp.type());
+		r.mask = Mat::zeros(a.mask.size(), a.mask.type());
+
+		a.temp.copyTo(r.a);
+		Rot(bRot, b.temp, r.rotation);
+		bRot.copyTo(r.b);
+		Rot(bMaskRot, b.mask, r.rotation);
+		Or(r.mask, a.mask, bMaskRot);
+	}
+	return r;
 }
 
 Iris readIris(int person, int iris)
@@ -170,7 +183,7 @@ void graph(int n = 5)
 			const Iris &a = data[k(i, j)];
 			for (int j2 = j + 1; j2 <= n; j2++) {
 				Iris &b = data[k(i, j2)];
-				int best = Compare(a, b);
+				int best = Compare(a, b).distance;
 				same[best]++;
 			}
 		}
@@ -185,7 +198,7 @@ void graph(int n = 5)
 				// each iris
 				for (int pi = 1; pi <= n; pi++) {
 					Iris &b = data[k(p, pi)];
-					int best = Compare(a, b);
+					int best = Compare(a, b).distance;
 					diff[best]++;
 				}
 			}
@@ -202,7 +215,15 @@ void graph(int n = 5)
 
 int main(int argc, char **argv)
 {
-//	graph();
+	if (argc == 2) {
+		char ch = 0;
+		int n = 0;
+		sscanf(argv[1], "%c%d", &ch, &n);
+		if (ch == 'g' && n > 0) {
+			graph(n);
+			return 0;
+		}
+	}
 
 	if (argc != 3) {
 		printf("Usage: %s 1/1 2/1\n", argv[0]);
@@ -217,14 +238,15 @@ int main(int argc, char **argv)
 	sscanf(argv[2], "%d/%d", &person, &iris);
 	Iris b = readIris(person, iris);
 
-	int best = Compare(a, b);
+	CompareResult r = Compare(a, b, true);
 
-	cout << best << endl;
-	showImage("A template", a.temp, false);
-	showImage("A mask", a.mask, false);
-	showImage("B template", b.temp, false);
-	showImage("B mask", b.mask);
+	//	showImage("A mask", a.mask, false);
+	//	showImage("B mask", b.mask, false);
+
+	printf("Distance: %d\nRotation: %d\n", r.distance, r.rotation);
+	showImage("A template", r.a, false);
+	showImage("B template", r.b, false);
+	showImage("A, B mask", r.mask);
 
 	return 0;
 }
-
