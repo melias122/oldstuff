@@ -1,6 +1,14 @@
 package main
 
-import "hash/fnv"
+func hash32(s string) uint32 {
+	h := uint32(3)
+	for _, r := range s {
+		h ^= uint32(r)
+		h *= 0x80000057
+		h ^= h >> 15
+	}
+	return h
+}
 
 type hashTable struct {
 	count   int
@@ -14,9 +22,7 @@ type item struct {
 }
 
 func (h *hashTable) bucket(key string) uint32 {
-	hash := fnv.New32()
-	hash.Write([]byte(key))
-	return hash.Sum32() % uint32(len(h.buckets))
+	return hash32(key) % uint32(len(h.buckets))
 }
 
 func (h *hashTable) grow() {
@@ -80,4 +86,9 @@ func (h *hashTable) Get(key string) (int, bool) {
 
 	// we dont have key
 	return 0, false
+}
+
+func (h *hashTable) Contains(key string) bool {
+	_, ok := h.Get(key)
+	return ok
 }

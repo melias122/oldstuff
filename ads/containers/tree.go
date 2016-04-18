@@ -1,105 +1,122 @@
 package main
 
-type node struct {
-	left, right *node
-	item        string
+import "sort"
+
+type obvsNode struct {
+	left, right *obvsNode
+	key         string
 }
 
-type tree struct {
-	count int
-	root  *node
+func newObvsNode(words []word, R [][]int, i, j int) *obvsNode {
+	if i != j {
+		return &obvsNode{
+			key:   words[R[i][j]].str,
+			left:  newObvsNode(words, R, i, R[i][j]-1),
+			right: newObvsNode(words, R, R[i][j], j),
+		}
+	}
+	return nil
 }
 
-// func NewSplayTree() *tree {
-// 	return &tree{}
-// }
+type obvs struct {
+	root *obvsNode
+}
 
-// func (t *tree) splay(item Item) {
-// 	header := &node{}
-// 	l, r := header, header
-// 	var y *node
-// 	root := t.root
+func (o *obvs) Contains(key string) bool {
+	node := o.root
+	for node != nil {
+		if key == node.key {
+			return true
+		} else if key < node.key {
+			node = node.left
+		} else {
+			node = node.right
+		}
+	}
+	return false
+}
 
-// 	splaying := true
-// 	for splaying {
-// 		switch {
-// 		case item.Less(root.item): // item might be on the left path
-// 			if root.left == nil {
-// 				splaying = false
-// 				break
-// 			}
-// 			if item.Less(root.left.item) { // zig-zig -> rotate right
-// 				y = root.left
-// 				root.left = y.right
-// 				y.right = root
-// 				root = y
-// 				if root.left == nil {
-// 					splaying = false
-// 					break
-// 				}
-// 			}
-// 			r.left = root // link right
-// 			r = root
-// 			root = root.left
-// 		case root.item.Less(item): // item might be on the right path
-// 			if root.right == nil {
-// 				splaying = false
-// 				break
-// 			}
-// 			if root.right.item.Less(item) { // zig-zag -> rotage left
-// 				y = root.right
-// 				root.right = y.left
-// 				y.left = root
-// 				root = y
-// 				if root.right == nil {
-// 					splaying = false
-// 					break
-// 				}
-// 			}
-// 			l.right = root
-// 			l = root
-// 			root = root.right
-// 		default: // found the item
-// 			splaying = false
-// 		}
-// 	}
-// 	l.right = root.left
-// 	r.left = root.right
-// 	root.left = header.right
-// 	root.right = header.left
-// 	t.root = root
-// }
+func NewOBVS(words []word, dictionary []word) *obvs {
 
-// func (st *tree) Get(key Item) Item {
-// 	if st.root == nil {
-// 		return nil
-// 	}
-// 	st.splay(key)
-// 	if st.root.item.Less(key) || key.Less(st.root.item) {
-// 		return nil
-// 	}
-// 	return st.root.item
-// }
+	sort.Sort(wordSorter(words))
+	sort.Sort(wordSorter(dictionary))
 
-// func (t *tree) insert(item Item) {
-// 	n := &node{item: item}
-// 	if t.root == nil {
-// 		t.root = n
-// 		return
-// 	}
-// 	t.splay(item)
-// 	switch {
-// 	case item.Less(t.root.item):
-// 		n.left = t.root.left
-// 		n.right = t.root
-// 		t.root.left = nil
-// 	case t.root.item.Less(item):
-// 		n.right = t.root.right
-// 		n.left = t.root
-// 		t.root.right = nil
-// 	default:
-// 		return
-// 	}
-// 	t.root = n
-// 	t.count++
-// }
+	var (
+		p = make([]int, len(words)+1)
+		q = make([]int, len(words)+1)
+		n = len(p)
+		W = new2DInts(n)
+		C = new2DInts(n)
+		R = new2DInts(n)
+	)
+
+	for i, w := range words {
+		p[i+1] = w.p
+	}
+
+	// find q values
+	var i int
+	for j, w := range words {
+		for dictionary[i] != w {
+			q[j] += dictionary[i].p
+			i++
+		}
+		i++
+	}
+
+	// create W matrix
+	for i := range q {
+		W[i][i] = q[i]
+		for j := i + 1; j < n; j++ {
+			W[i][j] = W[i][j-1] + p[j] + q[j]
+		}
+	}
+
+	// init C matrix
+	for i := 0; i < n; i++ {
+		C[i][i] = W[i][i]
+	}
+
+	// create C, init R
+	for i := 0; i < n-1; i++ {
+		j := i + 1
+		C[i][j] = C[i][i] + C[j][j] + W[i][j]
+		R[i][j] = j
+	}
+
+	// find R matrix
+	for i := 2; i < n; i++ {
+		for j := 0; j < n-i; j++ {
+			var (
+				k   = j + i
+				m   = R[j][k-1]
+				min = C[j][m-1] + C[m][k]
+			)
+
+			// find minimum
+			for l := m + 1; l <= R[j+1][k]; l++ {
+				x := C[j][l-1] + C[l][k]
+				if x < min {
+					m = l
+					min = x
+				}
+			}
+			C[j][k] = W[j][k] + min
+			R[j][k] = m
+		}
+	}
+
+	// we need first word empty
+	_words := append([]word{{}}, words...)
+	return &obvs{
+		root: newObvsNode(_words, R, 0, len(_words)-1),
+	}
+}
+
+func new2DInts(n int) [][]int {
+	ints := make([][]int, n)
+	for i := range ints {
+		ints[i] = make([]int, n)
+	}
+	return ints
+}

@@ -1,19 +1,13 @@
 package main
 
-import "fmt"
-
 type trieNode struct {
-	key   string
-	value rune
+	key   rune
+	value string
 	nodes []*trieNode
 }
 
-func newTrieNode(value rune) *trieNode {
-	return &trieNode{value: value}
-}
-
-func (n *trieNode) String() string {
-	return fmt.Sprint(string(n.value))
+func newTrieNode(key rune, value string) *trieNode {
+	return &trieNode{key: key, value: value}
 }
 
 type trie struct {
@@ -26,25 +20,49 @@ func NewTrie() *trie {
 
 func (t *trie) Put(value string) {
 	if t.root == nil {
-		t.root = newTrieNode(0)
+		t.root = newTrieNode(0, "")
 	}
 	node := t.root
-	for _, v := range value {
+	for i, v := range value {
 		var next *trieNode
 		for _, node := range node.nodes {
-			if node.value == v {
+			if node.key == v {
 				next = node
 				break
 			}
 		}
 		if next == nil {
-			next = newTrieNode(v)
+			var j int
+			if i+1 == len(value) {
+				j = i + 1
+			}
+			next = newTrieNode(v, value[:j])
 			node.nodes = append(node.nodes, next)
 		}
 		node = next
 	}
 }
 
-func (t *trie) Get(value string) {
-
+func (t *trie) Contains(value string) bool {
+	if t.root == nil {
+		return false
+	}
+	node := t.root
+	for _, v := range value {
+		var next *trieNode
+		for _, node := range node.nodes {
+			if node.key == v {
+				next = node
+				break
+			}
+		}
+		if next == nil {
+			return false
+		}
+		node = next
+	}
+	if node.value != value {
+		return false
+	}
+	return true
 }

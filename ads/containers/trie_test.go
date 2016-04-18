@@ -28,9 +28,26 @@ func levelOrder(i int, m map[int]string, n []*trieNode) {
 
 func TestTrie(t *testing.T) {
 	trie := NewTrie()
-	trie.Put("Martin")
-	trie.Put("Maros")
-	trie.Put("Jozo")
-	printTrie(trie)
-	// t.Log(trie.String())
+
+	tests := []string{
+		"Martin",
+		"Maros",
+		"Jozo",
+		"Fero",
+		"oref",
+	}
+
+	for _, s := range tests {
+		trie.Put(s)
+	}
+	for _, s := range tests {
+		if !trie.Contains(s) {
+			t.Fatalf("Expected %s to be in trie", s)
+		}
+	}
+	for _, s := range []string{"Martis", "martin"} {
+		if trie.Contains(s) {
+			t.Fatalf("Expected %s to be not in trie", s)
+		}
+	}
 }
