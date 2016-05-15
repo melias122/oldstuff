@@ -76,15 +76,15 @@ void Or(Mat &result, const Mat &a, const Mat &b)
 
 int Ham(const Mat &a, const Mat &b, const Mat &mask)
 {
-	int i = 0;
-	for (int r = 0; r < a.rows; r++) {
-		for (int c = 0; c < a.cols; c++) {
-			if (mask.at<uchar>(r, c) == 0) {
-				i += (a.at<uchar>(r, c) != b.at<uchar>(r, c));
-			}
-		}
+    int i = 0;
+    for (int r = 0; r < a.rows; r++) {
+	for (int c = 0; c < a.cols; c++) {
+	    if (mask.at<uchar>(r, c) == 0) {
+		i += (a.at<uchar>(r, c) != b.at<uchar>(r, c));
+	    }
 	}
-	return i;
+    }
+    return i;
 }
 
 struct CompareResult {
