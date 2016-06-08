@@ -1,0 +1,2 @@
+build: stiahnut compiler z golang.org
+pouzitie programu ./program < vstupny_text.txt > opraveny_text.txt
